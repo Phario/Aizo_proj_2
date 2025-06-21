@@ -110,142 +110,6 @@ public:
 
 		return result;
 	}
-	pathResult dijkstraAlgorithmAL(const std::vector<neighbour*>& adjacencyList, int vertices) {
-		int source = 0; // Always start from vertex 0
-		std::vector<int> cost(vertices, INT_MAX);
-		std::vector<int> prev(vertices, -1);
-		std::vector<bool> visited(vertices, false);
-
-		cost[source] = 0;
-
-		// Run Dijkstra's algorithm
-		for (int i = 0; i < vertices; i++) {
-			// Find the unvisited vertex with minimum cost
-			int u = -1;
-			for (int j = 0; j < vertices; j++) {
-				if (!visited[j] && (u == -1 || cost[j] < cost[u])) {
-					u = j;
-				}
-			}
-
-			// If we can't reach any more vertices, break
-			if (cost[u] == INT_MAX) break;
-
-			visited[u] = true;
-
-			// Relax all adjacent edges
-			for (neighbour* v = adjacencyList[u]; v != nullptr; v = v->next) {
-				if (!visited[v->vertex] && cost[u] + v->weight < cost[v->vertex]) {
-					cost[v->vertex] = cost[u] + v->weight;
-					prev[v->vertex] = u;
-				}
-			}
-		}
-
-		// Build result structure
-		pathResult result;
-		result.source = source;
-		result.cost = cost;
-		result.predecessors = prev;
-		result.paths.resize(vertices);
-
-		// Reconstruct all paths
-		for (int target = 0; target < vertices; target++) {
-			if (cost[target] == INT_MAX) {
-				// No path to this vertex
-				result.paths[target] = {}; // Empty path
-			}
-			else {
-				// Reconstruct path from source to target
-				std::vector<int> path;
-				int current = target;
-				while (current != -1) {
-					path.push_back(current);
-					current = prev[current];
-				}
-				std::reverse(path.begin(), path.end());
-				result.paths[target] = path;
-			}
-		}
-
-		return result;
-	}
-	pathResult dijkstraAllPathsIM(const std::vector<std::vector<int>>& incidenceMatrix, int vertices) {
-		int source = 0; // Always start from vertex 0
-		std::vector<int> cost(vertices, INT_MAX);
-		std::vector<int> prev(vertices, -1);
-		std::vector<bool> visited(vertices, false);
-
-		int numEdges = incidenceMatrix[0].size();
-		cost[source] = 0;
-
-		// Run Dijkstra's algorithm
-		for (int i = 0; i < vertices; i++) {
-			// Find the unvisited vertex with minimum distance
-			int u = -1;
-			for (int j = 0; j < vertices; j++) {
-				if (!visited[j] && (u == -1 || cost[j] < cost[u])) {
-					u = j;
-				}
-			}
-
-			// If we can't reach any more vertices, break
-			if (cost[u] == INT_MAX) break;
-
-			visited[u] = true;
-
-			// Check all edges to find adjacent vertices
-			for (int edgeIdx = 0; edgeIdx < numEdges; edgeIdx++) {
-				// Check if vertex u participates in this edge
-				if (incidenceMatrix[u][edgeIdx] != 0) {
-					// Find the other vertex in this edge
-					for (int v = 0; v < vertices; v++) {
-						if (v != u && incidenceMatrix[v][edgeIdx] != 0) {
-							// Found adjacent vertex v
-							if (!visited[v]) {
-								// For weighted incidence matrix, the weight is the absolute value
-								int weight = abs(incidenceMatrix[u][edgeIdx]);
-
-								if (cost[u] + weight < cost[v]) {
-									cost[v] = cost[u] + weight;
-									prev[v] = u;
-								}
-							}
-							break; // Each edge connects exactly 2 vertices
-						}
-					}
-				}
-			}
-		}
-
-		// Build result structure
-		pathResult result;
-		result.source = source;
-		result.cost = cost;
-		result.predecessors = prev;
-		result.paths.resize(vertices);
-
-		// Reconstruct all paths
-		for (int target = 0; target < vertices; target++) {
-			if (cost[target] == INT_MAX) {
-				// No path to this vertex
-				result.paths[target] = {}; // Empty path
-			}
-			else {
-				// Reconstruct path from source to target
-				std::vector<int> path;
-				int current = target;
-				while (current != -1) {
-					path.push_back(current);
-					current = prev[current];
-				}
-				std::reverse(path.begin(), path.end());
-				result.paths[target] = path;
-			}
-		}
-
-		return result;
-	}
 	mstResult kruskalAlgorithmAL(const std::vector<neighbour*>& adjacencyList, int vertices) {
 		std::vector<Edge> edges;
 
@@ -356,6 +220,142 @@ public:
 				if (result.edges.size() == vertices - 1) {
 					break;
 				}
+			}
+		}
+
+		return result;
+	}
+	pathResult dijkstraAlgorithmAL(const std::vector<neighbour*>& adjacencyList, int vertices) {
+		int source = 0; // Always start from vertex 0
+		std::vector<int> cost(vertices, INT_MAX);
+		std::vector<int> prev(vertices, -1);
+		std::vector<bool> visited(vertices, false);
+
+		cost[source] = 0;
+
+		// Run Dijkstra's algorithm
+		for (int i = 0; i < vertices; i++) {
+			// Find the unvisited vertex with minimum cost
+			int u = -1;
+			for (int j = 0; j < vertices; j++) {
+				if (!visited[j] && (u == -1 || cost[j] < cost[u])) {
+					u = j;
+				}
+			}
+
+			// If we can't reach any more vertices, break
+			if (cost[u] == INT_MAX) break;
+
+			visited[u] = true;
+
+			// Relax all adjacent edges
+			for (neighbour* v = adjacencyList[u]; v != nullptr; v = v->next) {
+				if (!visited[v->vertex] && cost[u] + v->weight < cost[v->vertex]) {
+					cost[v->vertex] = cost[u] + v->weight;
+					prev[v->vertex] = u;
+				}
+			}
+		}
+
+		// Build result structure
+		pathResult result;
+		result.source = source;
+		result.cost = cost;
+		result.predecessors = prev;
+		result.paths.resize(vertices);
+
+		// Reconstruct all paths
+		for (int target = 0; target < vertices; target++) {
+			if (cost[target] == INT_MAX) {
+				// No path to this vertex
+				result.paths[target] = {}; // Empty path
+			}
+			else {
+				// Reconstruct path from source to target
+				std::vector<int> path;
+				int current = target;
+				while (current != -1) {
+					path.push_back(current);
+					current = prev[current];
+				}
+				std::reverse(path.begin(), path.end());
+				result.paths[target] = path;
+			}
+		}
+
+		return result;
+	}
+	pathResult dijkstraAlgorithmIM(const std::vector<std::vector<int>>& incidenceMatrix, int vertices) {
+		int source = 0; // Always start from vertex 0
+		std::vector<int> cost(vertices, INT_MAX);
+		std::vector<int> prev(vertices, -1);
+		std::vector<bool> visited(vertices, false);
+
+		int numEdges = incidenceMatrix[0].size();
+		cost[source] = 0;
+
+		// Run Dijkstra's algorithm
+		for (int i = 0; i < vertices; i++) {
+			// Find the unvisited vertex with minimum distance
+			int u = -1;
+			for (int j = 0; j < vertices; j++) {
+				if (!visited[j] && (u == -1 || cost[j] < cost[u])) {
+					u = j;
+				}
+			}
+
+			// If we can't reach any more vertices, break
+			if (cost[u] == INT_MAX) break;
+
+			visited[u] = true;
+
+			// Check all edges to find adjacent vertices
+			for (int edgeIdx = 0; edgeIdx < numEdges; edgeIdx++) {
+				// Check if vertex u participates in this edge
+				if (incidenceMatrix[u][edgeIdx] != 0) {
+					// Find the other vertex in this edge
+					for (int v = 0; v < vertices; v++) {
+						if (v != u && incidenceMatrix[v][edgeIdx] != 0) {
+							// Found adjacent vertex v
+							if (!visited[v]) {
+								// For weighted incidence matrix, the weight is the absolute value
+								int weight = abs(incidenceMatrix[u][edgeIdx]);
+
+								if (cost[u] + weight < cost[v]) {
+									cost[v] = cost[u] + weight;
+									prev[v] = u;
+								}
+							}
+							break; // Each edge connects exactly 2 vertices
+						}
+					}
+				}
+			}
+		}
+
+		// Build result structure
+		pathResult result;
+		result.source = source;
+		result.cost = cost;
+		result.predecessors = prev;
+		result.paths.resize(vertices);
+
+		// Reconstruct all paths
+		for (int target = 0; target < vertices; target++) {
+			if (cost[target] == INT_MAX) {
+				// No path to this vertex
+				result.paths[target] = {}; // Empty path
+			}
+			else {
+				// Reconstruct path from source to target
+				std::vector<int> path;
+				int current = target;
+				while (current != -1) {
+					path.push_back(current);
+					current = prev[current];
+				}
+				std::reverse(path.begin(), path.end());
+				result.paths[target] = path;
 			}
 		}
 
@@ -494,7 +494,29 @@ public:
 
 		return result;
 	}
-	private:
+	void printMST(const mstResult& result) {
+		std::cout << "Minimum Spanning Tree Edges:\n";
+		for (const auto& edge : result.edges) {
+			std::cout << edge << "\n";
+		}
+		std::cout << "Total Cost: " << result.cost << "\n";
+	}
+	void printPaths(const pathResult& result) {
+		std::cout << "Shortest Paths from Source " << result.source << ":\n";
+		for (int i = 0; i < result.paths.size(); i++) {
+			std::cout << "To Vertex " << i << ": Cost = " << result.cost[i] << ", Path = ";
+			if (result.paths[i].empty()) {
+				std::cout << "No path\n";
+			} else {
+				for (int j = 0; j < result.paths[i].size(); j++) {
+					std::cout << result.paths[i][j];
+					if (j < result.paths[i].size() - 1) std::cout << " -> ";
+				}
+				std::cout << "\n";
+			}
+		}
+	}
+private:
 		// Union-Find (Disjoint Set) helper functions for Kruskal's algorithm
 		int find(std::vector<int>& parent, int x) {
 			if (parent[x] != x) {

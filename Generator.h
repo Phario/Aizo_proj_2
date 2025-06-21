@@ -1,11 +1,16 @@
 #pragma once
 #ifndef GENERATOR_H
 #define GENERATOR_H
-#include<ctime>
-#include<cstdlib>
-#include<vector>
-#include<string>
+#include <ctime>
+#include <cstdlib>
+#include <vector>
+#include <string>
 #include <algorithm>
+#include <iostream>
+#include <iomanip>
+#include <tuple>
+#include <random>
+#include <unordered_set> 
 struct neighbour {
 	neighbour* next;
 	int vertex;
@@ -84,16 +89,17 @@ public:
 		return adjacencyList;
 	}
 	std::vector<std::vector<int>> reduceIncidenceMatrixDensity(const std::vector<std::vector<int>>& matrix, double density, int vertices) {
-
 		int originalCols = matrix[0].size();
 		int newEdges = static_cast<int>(originalCols * density);
-		//safety check
+
+		// Safety check
 		if (newEdges > originalCols) {
 			newEdges = originalCols;
 		}
-		std::vector<std::vector<int>> reducedMatrix(vertices, std::vector<int>(newEdges, 0));
-		int reducedEdgeIndex = 0;
-		for (int col = 0; col < originalCols && reducedEdgeIndex < newEdges; col++) {
+
+		// Step 1: Find all valid edge columns (columns with exactly 2 non-zero entries)
+		std::vector<int> validColumns;
+		for (int col = 0; col < originalCols; col++) {
 			int nonZeroCount = 0;
 			for (int row = 0; row < vertices; row++) {
 				if (matrix[row][col] != 0) {
@@ -101,96 +107,159 @@ public:
 				}
 			}
 			if (nonZeroCount == 2) {
-				for (int row = 0; row < vertices; row++) {
-					reducedMatrix[row][reducedEdgeIndex] = matrix[row][col];
-				}
-				reducedEdgeIndex++;
+				validColumns.push_back(col);
+			}
+		}
+
+		// Step 2: Randomly shuffle the valid columns
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::shuffle(validColumns.begin(), validColumns.end(), gen);
+
+		// Step 3: Take the first 'newEdges' columns from the shuffled list
+		int edgesToKeep = std::min(newEdges, static_cast<int>(validColumns.size()));
+		std::vector<std::vector<int>> reducedMatrix(vertices, std::vector<int>(edgesToKeep, 0));
+
+		for (int i = 0; i < edgesToKeep; i++) {
+			int originalCol = validColumns[i];
+			for (int row = 0; row < vertices; row++) {
+				reducedMatrix[row][i] = matrix[row][originalCol];
 			}
 		}
 
 		return reducedMatrix;
 	}
 	std::vector<neighbour*> reduceAdjacencyListDensity(const std::vector<neighbour*>& list, double density, int vertices) {
-		//count edges
-		int totalEdgeCount = 0;
-		for (int i = 0; i < vertices; i++) {
+		// Step 1: Collect all unique undirected edges (i < j)
+		std::vector<std::tuple<int, int, int>> uniqueEdges;
+		std::unordered_set<int> originallyConnected;
+
+		for (int i = 0; i < vertices; ++i) {
 			neighbour* current = list[i];
 			while (current) {
-				totalEdgeCount++;
+				int j = current->vertex;
+				int weight = current->weight;
+				originallyConnected.insert(i);
+				originallyConnected.insert(j);
+				if (i < j) {
+					uniqueEdges.emplace_back(i, j, weight);
+				}
 				current = current->next;
 			}
 		}
 
-		// For undirected graphs, divide by 2 to get actual edge count
-		int actualEdges = totalEdgeCount / 2;
-		int newEdges = static_cast<int>(actualEdges * density);
+		// Step 2: Shuffle edges to randomize
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::shuffle(uniqueEdges.begin(), uniqueEdges.end(), gen);
+
+		// Step 3: Calculate number of edges to keep based on density
+		int totalEdges = static_cast<int>(uniqueEdges.size());
+		int edgesToKeep = static_cast<int>(totalEdges * density);
+
+		// Ensure minimum connectivity - at least enough edges to connect all originally connected vertices
+		int minEdgesForConnectivity = std::max(1, static_cast<int>(originallyConnected.size()) - 1);
+		edgesToKeep = std::max(edgesToKeep, minEdgesForConnectivity);
 
 		std::vector<neighbour*> reducedList(vertices, nullptr);
-
+		std::unordered_set<int> connectedVertices;
 		int edgesAdded = 0;
 
-		//iterate through vertices and their neighbors
-		for (int i = 0; i < vertices && edgesAdded < newEdges; i++) {
-			neighbour* current = list[i];
-			while (current && edgesAdded < newEdges) {
-				int j = current->vertex;
-				int weight = current->weight;
+		// First pass: prioritize connecting isolated vertices
+		for (const auto& edge : uniqueEdges) {
+			if (edgesAdded >= edgesToKeep) break;
 
-				//For undirected graphs, only process each edge once (i < j)
-				//This avoids duplicates since each edge appears in both adjacency lists
-				if (i < j) {
-					// Add edge i-j to vertex i's list
-					neighbour* newNeighbour1 = new neighbour{ reducedList[i], j, weight };
-					reducedList[i] = newNeighbour1;
+			int u = std::get<0>(edge);
+			int v = std::get<1>(edge);
+			int w = std::get<2>(edge);
 
-					// Add edge j-i to vertex j's list
-					neighbour* newNeighbour2 = new neighbour{ reducedList[j], i, weight };
-					reducedList[j] = newNeighbour2;
+			// Add edge if it connects a new vertex or we haven't reached the limit
+			bool connectsNewVertex = (connectedVertices.count(u) == 0 || connectedVertices.count(v) == 0);
 
-					edgesAdded++;
-				}
+			if (connectsNewVertex || edgesAdded < edgesToKeep) {
+				// Add u -> v
+				reducedList[u] = new neighbour{ reducedList[u], v, w };
+				// Add v -> u  
+				reducedList[v] = new neighbour{ reducedList[v], u, w };
 
-				current = current->next;
+				connectedVertices.insert(u);
+				connectedVertices.insert(v);
+				edgesAdded++;
 			}
 		}
 
 		return reducedList;
 	}
 	std::vector<neighbour*> reduceDirectedAdjacencyListDensity(const std::vector<neighbour*>& list, double density, int vertices) {
-		// Count total directed edges
-		int totalEdges = 0;
+		// Step 1: Collect all directed edges
+		std::vector<std::tuple<int, int, int>> allEdges; // (from, to, weight)
+
 		for (int i = 0; i < vertices; i++) {
 			neighbour* current = list[i];
 			while (current) {
-				totalEdges++;
+				allEdges.emplace_back(i, current->vertex, current->weight);
 				current = current->next;
 			}
 		}
 
-		int newEdges = static_cast<int>(totalEdges * density);
+		// Step 2: Shuffle edges randomly
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::shuffle(allEdges.begin(), allEdges.end(), gen);
 
-		// Create reduced adjacency list
+		// Step 3: Calculate how many edges to keep
+		int totalEdges = static_cast<int>(allEdges.size());
+		int edgesToKeep = static_cast<int>(totalEdges * density);
+		edgesToKeep = std::max(edgesToKeep, 1); // Keep at least 1 edge if any exist
+
+		// Step 4: Create new adjacency list with selected edges
 		std::vector<neighbour*> reducedList(vertices, nullptr);
 
-		int edgesAdded = 0;
+		for (int i = 0; i < edgesToKeep && i < totalEdges; i++) {
+			int from = std::get<0>(allEdges[i]);
+			int to = std::get<1>(allEdges[i]);
+			int weight = std::get<2>(allEdges[i]);
 
-		// Iterate through all vertices and their neighbors
-		for (int i = 0; i < vertices && edgesAdded < newEdges; i++) {
-			neighbour* current = list[i];
-			while (current && edgesAdded < newEdges) {
-				int j = current->vertex;
-				int weight = current->weight;
-
-				// For directed graphs, add each edge as-is
-				neighbour* newNeighbour = new neighbour{ reducedList[i], j, weight };
-				reducedList[i] = newNeighbour;
-
-				edgesAdded++;
-				current = current->next;
-			}
+			// Add edge to adjacency list (insert at head for simplicity)
+			reducedList[from] = new neighbour{ reducedList[from], to, weight };
 		}
 
 		return reducedList;
+	}	//print adjacency list for debugging
+	void printAdjacencyList(const std::vector<neighbour*>& list, int vertices) {
+		for (int i = 0; i < vertices; i++) {
+			std::cout << "Vertex " << i << ": ";
+			neighbour* current = list[i];
+			while (current) {
+				std::cout << "(" << current->vertex << ", " << current->weight << ") ";
+				current = current->next;
+			}
+			std::cout << std::endl;
+		}
+	}
+	//print incidence matrix in formatted table format for debugging
+	void printIncidenceMatrix(const std::vector<std::vector<int>>& matrix, int vertices) {
+		int edges = matrix[0].size();
+		std::cout << "Incidence Matrix (" << vertices << " vertices, " << edges << " edges):" << std::endl;
+
+		for (int i = 0; i < vertices; i++) {
+			for (int j = 0; j < edges; j++) {
+				std::cout << std::setw(4) << matrix[i][j];
+			}
+			std::cout << std::endl;
+		}
+	}
+	//destructors
+	//deallocate adjacency list
+	void deleteAdjacencyList(std::vector<neighbour*>& list) {
+		for (auto& head : list) {
+			while (head) {
+				neighbour* temp = head;
+				head = head->next;
+				delete temp;
+			}
+		}
+		list.clear();
 	}
 };
 #endif

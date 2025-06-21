@@ -21,6 +21,7 @@ Structure of config file:
 0		#algorithm in test mode: 0-Prim, 1-Kruskal, 2-Dijkstra, 3-Ford, Dijkstra and Ford only for directed graphs, Prim and Kruskal only for undirected graphs
 0		#test graph source, 0-load from file 1-generate random
 */
+
 // FileData structure to hold the configuration data
 struct fileData {
 	int mode;
@@ -54,9 +55,46 @@ struct spResultsData {
 	std::vector<double> dijkstraTimeIM;
 	std::vector<double> bellmanFordTimeIM;
 };
+struct algorithmAvgTimes {
+	double primAL;
+	double kruskalAL;
+	double primIM;
+	double kruskalIM;
+	double dijkstraAL;
+	double bellmanFordAL;
+	double dijkstraIM;
+	double bellmanFordIM;
+};
+void performTest();
 std::vector<mstResultsData> performMSTSimulation(mstSimData mstSimData);
 std::vector<spResultsData> performSPSimulation(mstSimData mstSimData);
-void performTest();
+void saveToCSV(const std::vector<algorithmAvgTimes>& avgTimes) {
+	std::cout << "Enter the path to save results (e.g., C:/Users/userName/Desktop): ";
+	std::string fileName;
+	std::cin >> fileName;
+	fileName += "/results.csv";
+	std::ofstream outFile(fileName);
+
+	if (!outFile.is_open()) {
+		std::cerr << "Error opening file for writing: " << fileName << std::endl;
+		return;
+	}
+	outFile << "PrimAL;KruskalAL;PrimIM;KruskalIM;DijkstraAL;BellmanFordAL;DijkstraIM;BellmanFordIM\n";
+	for (const auto& times : avgTimes) {
+		outFile << times.primAL << ";"
+				<< times.kruskalAL << ";"
+				<< times.primIM << ";"
+				<< times.kruskalIM << ";"
+				<< times.dijkstraAL << ";"
+				<< times.bellmanFordAL << ";"
+				<< times.dijkstraIM << ";"
+				<< times.bellmanFordIM << "\n";
+	}
+	outFile.close();
+}
+void performTest(fileData fileData) {
+	
+}
 fileData loadFileData() {
 	fileData fileData;
 	std::string filePath;
@@ -106,8 +144,9 @@ double calculateAverageTime(const std::vector<double>& results) {
 	for (double time : results) {
 		sum += time;
 	}
-	return sum / results.size();
+	return std::round((sum / results.size()) * 100.0) / 100.0; //Round to 2 decimal places
 }
+
 std::vector<mstResultsData> performMSTSimulation(mstSimData simData) {
 	// Create one result structure to store all times for this size
 	std::vector<mstResultsData> results(1);  // Only one element needed
@@ -298,16 +337,18 @@ void performTest() {
 	// Clean up dynamically allocated memory in adjacency list
 	generator.deleteAdjacencyList(adjacencyList);
 }
+
 int main() {
-	std::vector<double> avgTimes;
+	std::vector<algorithmAvgTimes> avgTimes;
 	fileData fileData = loadFileData();
 	if (fileData.mode == 1) {
-		// Perform simulation mode
+		//Perform sim mode
 		mstSimData simData;
 		simData.size = fileData.initialSize;
 		simData.instanceAmount = fileData.instanceAmount;
 		simData.density = fileData.density;
 		simData.maxRand = fileData.maxRand;
+		algorithmAvgTimes avgTimesData;
 		std::cout << "Starting simulation with the following parameters:\n";
 		std::cout << "Initial size: " << simData.size << "\n";
 		std::cout << "Size amount: " << fileData.sizeAmount << "\n";
@@ -318,7 +359,7 @@ int main() {
 		for (int i = 0; i < fileData.sizeAmount; i++) {
 			simData.size = fileData.initialSize + i * fileData.intervalAmount;
 			std::cout << "Graph size: " << simData.size << "\n";
-			// MST simulation
+			//MST sim
 			auto mstResults = performMSTSimulation(simData);
 			for (const auto& result : mstResults) {
 				std::cout << "Average Prim's time on adjacency list:         " << calculateAverageTime(result.primTimeAL) << " ms\n";
@@ -326,7 +367,7 @@ int main() {
 				std::cout << "Average Prim's time on incidence matrix:       " << calculateAverageTime(result.primTimeIM) << " ms\n";
 				std::cout << "Average Kruskal's time on incidence matrix:    " << calculateAverageTime(result.kruskalTimeIM) << " ms\n";
 			}
-			// SP simulation
+			//SP sim
 			auto spResults = performSPSimulation(simData);
 			for (const auto& result : spResults) {
 				std::cout << "Average Dijkstra's time on adjacency list:     " << calculateAverageTime(result.dijkstraTimeAL) << " ms\n";
@@ -334,9 +375,21 @@ int main() {
 				std::cout << "Average Dijkstra's time on incidence matrix:   " << calculateAverageTime(result.dijkstraTimeIM) << " ms\n";
 				std::cout << "Average Bellman-Ford time on incidence matrix: " << calculateAverageTime(result.bellmanFordTimeIM) << " ms\n";
 			}
+			//Calculate averages
+			avgTimesData.primAL = calculateAverageTime(mstResults[0].primTimeAL);
+			avgTimesData.kruskalAL = calculateAverageTime(mstResults[0].kruskalTimeAL);
+			avgTimesData.primIM = calculateAverageTime(mstResults[0].primTimeIM);
+			avgTimesData.kruskalIM = calculateAverageTime(mstResults[0].kruskalTimeIM);
+			avgTimesData.dijkstraAL = calculateAverageTime(spResults[0].dijkstraTimeAL);
+			avgTimesData.bellmanFordAL = calculateAverageTime(spResults[0].bellmanFordTimeAL);
+			avgTimesData.dijkstraIM = calculateAverageTime(spResults[0].dijkstraTimeIM);
+			avgTimesData.bellmanFordIM = calculateAverageTime(spResults[0].bellmanFordTimeIM);
+			//Save averages from this size
+			avgTimes.push_back(avgTimesData);
+			std::cout << "----------------------------------------\n";
 		}
+		saveToCSV(avgTimes);
 	} else if (fileData.mode == 0) {
-		// Perform test mode
 		performTest();
 	} else {
 		std::cerr << "Invalid mode in config file." << std::endl;

@@ -11,6 +11,15 @@
 #include <tuple>
 #include <random>
 #include <unordered_set> 
+#include <fstream>
+
+/*
+Structure of a source file for a graph:
+E V						# E - number of edges, V - number of vertices separated by space, the edges are numbered from 0 to V-1
+start end weight		# start and end vertices of the edge and its weight, one edge per line
+...						# MST - edges are undirected, SP - edges are directed
+*/
+
 struct neighbour {
 	neighbour* next;
 	int vertex;
@@ -226,6 +235,31 @@ public:
 
 		return reducedList;
 	}	//print adjacency list for debugging
+
+	std::vector<std::vector<int>> loadWeightedDirectedAdjacencyListFromFile(const std::string& filename) {
+		std::vector<std::vector<int>> adjacencyList;
+		std::ifstream file(filename);
+		if (!file.is_open()) {
+			std::cerr << "Error opening file: " << filename << std::endl;
+			return adjacencyList;
+		}
+		int vertices, edges;
+		file >> edges >> vertices;
+		adjacencyList.resize(vertices);
+		for (int i = 0; i < edges; i++) {
+			int start, end, weight;
+			file >> start >> end >> weight;
+			if (start < 0 || start >= vertices || end < 0 || end >= vertices) {
+				std::cerr << "Invalid edge in file: " << start << " -> " << end << std::endl;
+				continue;
+			}
+			adjacencyList[start].push_back(end);
+			adjacencyList[end].push_back(start); // For undirected graph
+		}
+		file.close();
+		return adjacencyList;
+	}
+
 	void printAdjacencyList(const std::vector<neighbour*>& list, int vertices) {
 		for (int i = 0; i < vertices; i++) {
 			std::cout << "Vertex " << i << ": ";

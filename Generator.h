@@ -19,7 +19,7 @@ E V						# E - number of edges, V - number of vertices separated by space, the e
 start end weight		# start and end vertices of the edge and its weight, one edge per line
 ...						# MST - edges are undirected, SP - edges are directed
 */
-
+// Structure for a neighbour in the adjacency list
 struct neighbour {
 	neighbour* next;
 	int vertex;
@@ -34,6 +34,7 @@ public:
 		srand(time(NULL)); 
 	}
 	// Generating graphs from scratch
+	// Generate a weighted incidence matrix for an undirected graph
 	std::vector<std::vector<int>> generateWeightedIncidenceMatrix(int n) {
 		std::vector<std::vector<int>> incidenceMatrix(n, std::vector<int>(n * (n - 1) / 2, 0));
 		int edgeIndex = 0;
@@ -47,6 +48,7 @@ public:
 		}
 		return incidenceMatrix;
 	}
+	// Generate a weighted incidence matrix for a directed graph
 	std::vector<std::vector<int>> generateWeightedDirectedIncidenceMatrix(int n) {
 		std::vector<std::vector<int>> incidenceMatrix(n, std::vector<int>(n * (n - 1), 0));
 		int edgeIndex = 0;
@@ -62,17 +64,16 @@ public:
 		}
 		return incidenceMatrix;
 	}
+	// Generate a weighted adjacency list for an undirected graph
 	std::vector<neighbour*> generateWeightedAdjacencyList(int n) {
 		std::vector<neighbour*> adjacencyList(n, nullptr);
 
 		for (int i = 0; i < n; i++) {
 			for (int j = i + 1; j < n; j++) {
 				int weight = rand() % maxRand + 1;
-
 				// Add j as neighbor of i
 				neighbour* newNeighbour1 = new neighbour{ adjacencyList[i], j, weight };
 				adjacencyList[i] = newNeighbour1;
-
 				// Add i as neighbor of j (undirected graph)
 				neighbour* newNeighbour2 = new neighbour{ adjacencyList[j], i, weight };
 				adjacencyList[j] = newNeighbour2;
@@ -81,33 +82,31 @@ public:
 
 		return adjacencyList;
 	}
+	// Generate a weighted incidence matrix from a file
 	std::vector<neighbour*> generateWeightedDirectedAdjacencyList(int n) {
 		std::vector<neighbour*> adjacencyList(n, nullptr);
-
 		for (int i = 0; i < n; i++) {
 			for (int j = 0; j < n; j++) {
 				if (i != j) {
 					int weight = rand() % maxRand + 1;
-
 					// Add j as neighbor of i (directed edge i -> j)
 					neighbour* newNeighbour = new neighbour{ adjacencyList[i], j, weight };
 					adjacencyList[i] = newNeighbour;
 				}
 			}
 		}
-
 		return adjacencyList;
 	}
+	// Generate a weighted incidence matrix from a file
 	std::vector<std::vector<int>> reduceIncidenceMatrixDensity(const std::vector<std::vector<int>>& matrix, double density, int vertices) {
 		int originalCols = matrix[0].size();
 		int newEdges = static_cast<int>(originalCols * density);
-
 		// Safety check
 		if (newEdges > originalCols) {
 			newEdges = originalCols;
 		}
 
-		// Step 1: Find all valid edge columns (columns with exactly 2 non-zero entries)
+		// Find all valid edge columns
 		std::vector<int> validColumns;
 		for (int col = 0; col < originalCols; col++) {
 			int nonZeroCount = 0;
@@ -120,30 +119,27 @@ public:
 				validColumns.push_back(col);
 			}
 		}
-
-		// Step 2: Randomly shuffle the valid columns
+		// Randomly shuffle the valid columns
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::shuffle(validColumns.begin(), validColumns.end(), gen);
-
-		// Step 3: Take the first 'newEdges' columns from the shuffled list
+		// Take the first of the newEdges columns from the shuffled list
 		int edgesToKeep = std::min(newEdges, static_cast<int>(validColumns.size()));
 		std::vector<std::vector<int>> reducedMatrix(vertices, std::vector<int>(edgesToKeep, 0));
-
+		// Fill the reduced matrix with the selected edges
 		for (int i = 0; i < edgesToKeep; i++) {
 			int originalCol = validColumns[i];
 			for (int row = 0; row < vertices; row++) {
 				reducedMatrix[row][i] = matrix[row][originalCol];
 			}
 		}
-
 		return reducedMatrix;
 	}
+	// Reduce the density of an undirected adjacency list
 	std::vector<neighbour*> reduceAdjacencyListDensity(const std::vector<neighbour*>& list, double density, int vertices) {
-		// Step 1: Collect all unique undirected edges (i < j)
+		// Collect all unique undirected edges (i < j)
 		std::vector<std::tuple<int, int, int>> uniqueEdges;
 		std::unordered_set<int> originallyConnected;
-
 		for (int i = 0; i < vertices; ++i) {
 			neighbour* current = list[i];
 			while (current) {
@@ -157,53 +153,43 @@ public:
 				current = current->next;
 			}
 		}
-
-		// Step 2: Shuffle edges to randomize
+		// Shuffle edges to randomize
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::shuffle(uniqueEdges.begin(), uniqueEdges.end(), gen);
-
-		// Step 3: Calculate number of edges to keep based on density
+		// Calculate number of edges to keep based on density
 		int totalEdges = static_cast<int>(uniqueEdges.size());
 		int edgesToKeep = static_cast<int>(totalEdges * density);
-
-		// Ensure minimum connectivity - at least enough edges to connect all originally connected vertices
+		// Ensure minimum connectivity
 		int minEdgesForConnectivity = std::max(1, static_cast<int>(originallyConnected.size()) - 1);
 		edgesToKeep = std::max(edgesToKeep, minEdgesForConnectivity);
-
 		std::vector<neighbour*> reducedList(vertices, nullptr);
 		std::unordered_set<int> connectedVertices;
 		int edgesAdded = 0;
-
 		// First pass: prioritize connecting isolated vertices
 		for (const auto& edge : uniqueEdges) {
 			if (edgesAdded >= edgesToKeep) break;
-
 			int u = std::get<0>(edge);
 			int v = std::get<1>(edge);
 			int w = std::get<2>(edge);
-
-			// Add edge if it connects a new vertex or we haven't reached the limit
+			// Add edge if it connects a new vertex or limit isn't reached
 			bool connectsNewVertex = (connectedVertices.count(u) == 0 || connectedVertices.count(v) == 0);
-
 			if (connectsNewVertex || edgesAdded < edgesToKeep) {
 				// Add u -> v
 				reducedList[u] = new neighbour{ reducedList[u], v, w };
 				// Add v -> u  
 				reducedList[v] = new neighbour{ reducedList[v], u, w };
-
 				connectedVertices.insert(u);
 				connectedVertices.insert(v);
 				edgesAdded++;
 			}
 		}
-
 		return reducedList;
 	}
+	// Reduce the density of a directed adjacency list
 	std::vector<neighbour*> reduceDirectedAdjacencyListDensity(const std::vector<neighbour*>& list, double density, int vertices) {
-		// Step 1: Collect all directed edges
+		// Collect all directed edges
 		std::vector<std::tuple<int, int, int>> allEdges; // (from, to, weight)
-
 		for (int i = 0; i < vertices; i++) {
 			neighbour* current = list[i];
 			while (current) {
@@ -211,32 +197,27 @@ public:
 				current = current->next;
 			}
 		}
-
-		// Step 2: Shuffle edges randomly
+		// Shuffle edges randomly
 		std::random_device rd;
 		std::mt19937 gen(rd());
 		std::shuffle(allEdges.begin(), allEdges.end(), gen);
-
-		// Step 3: Calculate how many edges to keep
+		// Calculate how many edges to keep
 		int totalEdges = static_cast<int>(allEdges.size());
 		int edgesToKeep = static_cast<int>(totalEdges * density);
 		edgesToKeep = std::max(edgesToKeep, 1); // Keep at least 1 edge if any exist
-
-		// Step 4: Create new adjacency list with selected edges
+		// Create new adjacency list with selected edges
 		std::vector<neighbour*> reducedList(vertices, nullptr);
-
 		for (int i = 0; i < edgesToKeep && i < totalEdges; i++) {
 			int from = std::get<0>(allEdges[i]);
 			int to = std::get<1>(allEdges[i]);
 			int weight = std::get<2>(allEdges[i]);
-
 			// Add edge to adjacency list (insert at head for simplicity)
 			reducedList[from] = new neighbour{ reducedList[from], to, weight };
 		}
-
 		return reducedList;
 	}	//print adjacency list for debugging
 	// Generating graphs from file
+	// Generate a weighted incidence matrix from a file
 	std::vector<std::vector<int>> generateWeightedIncidenceMatrixFromFile(const std::string& filename) {
 		std::ifstream file(filename);
 		if (!file.is_open()) {
@@ -255,6 +236,7 @@ public:
 		file.close();
 		return incidenceMatrix;
 	}
+	// Generate a weighted adjacency list from a file
 	std::vector<neighbour*> generateWeightedAdjacencyListFromFile(const std::string& filename) {
 		std::ifstream file(filename);
 		if (!file.is_open()) {
@@ -274,6 +256,7 @@ public:
 		file.close();
 		return adjacencyList;
 	}
+	// Generate a weighted directed adjacency list from a file
 	std::vector<neighbour*> generateWeightedDirectedAdjacencyListFromFile(const std::string& filename) {
 		std::ifstream file(filename);
 		if (!file.is_open()) {
@@ -292,6 +275,7 @@ public:
 		file.close();
 		return adjacencyList;
 	}
+	// Generate a weighted directed incidence matrix from a file
 	std::vector<std::vector<int>> generateWeightedDirectedIncidenceMatrixFromFile(const std::string& filename) {
 		std::ifstream file(filename);
 		if (!file.is_open()) {
@@ -311,6 +295,7 @@ public:
 		return incidenceMatrix;
 	}
 	// Utils
+	// Print adjacency list in formatted table format for debugging
 	void printAdjacencyList(const std::vector<neighbour*>& list, int vertices) {
 		for (int i = 0; i < vertices; i++) {
 			std::cout << "Vertex " << i << ": ";

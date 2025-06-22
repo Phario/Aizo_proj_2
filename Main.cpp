@@ -8,7 +8,7 @@
 #include <limits>
 /*
 Structure of config file:
-0		#mode: 0-test, 1-simulation
+1		#mode: 0-test, 1-simulation
 40		#initialSize
 7		#sizeAmount: amount of different sizes to test
 50 		#density: 0-100 in percent
@@ -20,7 +20,6 @@ Structure of config file:
 0		#algorithm in test mode: 0-Prim, 1-Kruskal, 2-Dijkstra, 3-Ford, Dijkstra and Ford only for directed graphs, Prim and Kruskal only for undirected graphs
 0		#test graph source, 0-load from file 1-generate random
 */
-
 // FileData structure to hold the configuration data
 struct fileData {
 	int mode;
@@ -36,24 +35,28 @@ struct fileData {
 	int algorithm;
 	int testGraphSource;
 };
+// mstSimData structure to hold the parameters for MST simulation
 struct mstSimData {
 	int size;
 	int instanceAmount;
 	double density;
 	int maxRand;
 };
+// spSimData structure to hold the parameters for shortest path simulation
 struct mstResultsData {
 	std::vector<double> primTimeAL;
 	std::vector<double> kruskalTimeAL;
 	std::vector<double> primTimeIM;
 	std::vector<double> kruskalTimeIM;
 };
+// spResultsData structure to hold the results for shortest path simulation
 struct spResultsData {
 	std::vector<double> dijkstraTimeAL;
 	std::vector<double> bellmanFordTimeAL;
 	std::vector<double> dijkstraTimeIM;
 	std::vector<double> bellmanFordTimeIM;
 };
+// algorithmAvgTimes structure to hold the average times for each algorithm
 struct algorithmAvgTimes {
 	double primAL;
 	double kruskalAL;
@@ -64,15 +67,25 @@ struct algorithmAvgTimes {
 	double dijkstraIM;
 	double bellmanFordIM;
 };
+// Function prototypes
+// performTest function to execute the test based on fileData
 void performTest(const fileData fileData);
+// performSim function to execute the simulation based on fileData
+void performSim(const fileData fileData);
+// loadFileData function to read the configuration from a file
 std::vector<mstResultsData> performMSTSimulation(mstSimData mstSimData);
+// performSPSimulation function to execute the shortest path simulation
 std::vector<spResultsData> performSPSimulation(mstSimData mstSimData);
+// calculateAverageTime function to compute the average time from results
+double calculateAverageTime(const std::vector<double>& results);
+// saveToCSV function to save the average times to a CSV file
+void saveToCSV(const std::vector<algorithmAvgTimes>& avgTimes);
+
 void saveToCSV(const std::vector<algorithmAvgTimes>& avgTimes) {
 	std::cout << "Enter the path and filename to save results (e.g., C:/Users/userName/Desktop/results.csv): ";
 	std::string fileName;
 	std::cin >> fileName;
 	std::ofstream outFile(fileName);
-
 	if (!outFile.is_open()) {
 		std::cerr << "Error opening file for writing: " << fileName << std::endl;
 		return;
@@ -91,10 +104,8 @@ void saveToCSV(const std::vector<algorithmAvgTimes>& avgTimes) {
 	outFile.close();
 }
 void performTest(fileData fileData) {
-	// Load graph from file and generate AL and IM or generate random graph based on parameters
-	// Display graphs if required
-	// Run algorithms and display results
 	Generator generator(fileData.maxRand);
+	// Load graph from file and generate AL and IM or generate random graph based on parameters
 	if (fileData.task == 0) {
 		if (fileData.testGraphSource == 0) {
 			std::string filePath;
@@ -107,6 +118,7 @@ void performTest(fileData fileData) {
 				generator.printAdjacencyList(adjacencyList, fileData.initialSize);
 			}
 			Algorithms algorithms;
+			// Run algorithms and display results
 			if (fileData.algorithm == 0) {
 				auto mstResult = algorithms.primAlgorithmIM(matrix, fileData.initialSize);
 				algorithms.printMST(mstResult);
@@ -128,6 +140,7 @@ void performTest(fileData fileData) {
 				generator.printIncidenceMatrix(incidenceMatrix, fileData.initialSize);
 			}
 			Algorithms algorithms;
+			// Run algorithms and display results
 			if (fileData.algorithm == 0) {
 				auto mstResult = algorithms.primAlgorithmAL(adjacencyList, fileData.initialSize);
 				algorithms.printMST(mstResult);
@@ -147,11 +160,13 @@ void performTest(fileData fileData) {
 			std::cin >> filePath;
 			auto matrix = generator.generateWeightedDirectedIncidenceMatrixFromFile(filePath);
 			auto adjacencyList = generator.generateWeightedDirectedAdjacencyListFromFile(filePath);
+			// Display graphs if required
 			if (fileData.displayGraph == 1) {
 				generator.printIncidenceMatrix(matrix, fileData.initialSize);
 				generator.printAdjacencyList(adjacencyList, fileData.initialSize);
 			}
 			Algorithms algorithms;
+			// Run algorithms and display results
 			if (fileData.algorithm == 2) {
 				auto pathResult = algorithms.dijkstraAlgorithmIM(matrix, fileData.initialSize);
 				algorithms.printPaths(pathResult);
@@ -168,11 +183,13 @@ void performTest(fileData fileData) {
 			// Reduce density if specified
 			adjacencyList = generator.reduceDirectedAdjacencyListDensity(adjacencyList, fileData.density, fileData.initialSize);
 			incidenceMatrix = generator.reduceIncidenceMatrixDensity(incidenceMatrix, fileData.density, fileData.initialSize);
+			// Display graphs if required
 			if (fileData.displayGraph == 1) {
 				generator.printAdjacencyList(adjacencyList, fileData.initialSize);
 				generator.printIncidenceMatrix(incidenceMatrix, fileData.initialSize);
 			}
 			Algorithms algorithms;
+			// Run algorithms and display results
 			if (fileData.algorithm == 2) {
 				auto pathResult = algorithms.dijkstraAlgorithmAL(adjacencyList, fileData.initialSize);
 				algorithms.printPaths(pathResult);
@@ -240,116 +257,88 @@ double calculateAverageTime(const std::vector<double>& results) {
 	return std::round((sum / results.size()) * 100.0) / 100.0; //Round to 2 decimal places
 }
 std::vector<mstResultsData> performMSTSimulation(mstSimData simData) {
-	// Create one result structure to store all times for this size
-	std::vector<mstResultsData> results(1);  // Only one element needed
+	std::vector<mstResultsData> results(1);
 	mstResultsData& times = results[0];
-
 	Generator generator(simData.maxRand);
 	Algorithms algorithms;
-
 	// Reserve space for better performance
 	times.primTimeAL.reserve(simData.instanceAmount);
 	times.kruskalTimeAL.reserve(simData.instanceAmount);
 	times.primTimeIM.reserve(simData.instanceAmount);
 	times.kruskalTimeIM.reserve(simData.instanceAmount);
-
 	// Process each instance individually to save memory
 	for (int i = 0; i < simData.instanceAmount; ++i) {
 		// Generate and test adjacency list
 		auto adjacencyList = generator.generateWeightedAdjacencyList(simData.size);
 		adjacencyList = generator.reduceAdjacencyListDensity(adjacencyList, simData.density, simData.size);
-
 		// Time Prim's algorithm on adjacency list
 		auto start = std::chrono::high_resolution_clock::now();
 		auto primResultAL = algorithms.primAlgorithmAL(adjacencyList, simData.size);
 		auto end = std::chrono::high_resolution_clock::now();
 		times.primTimeAL.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
 		// Time Kruskal's algorithm on adjacency list
 		start = std::chrono::high_resolution_clock::now();
 		auto kruskalResultAL = algorithms.kruskalAlgorithmAL(adjacencyList, simData.size);
 		end = std::chrono::high_resolution_clock::now();
 		times.kruskalTimeAL.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
 		// Clean up adjacency list
 		generator.deleteAdjacencyList(adjacencyList);
-
 		// Generate and test incidence matrix
 		auto incidenceMatrix = generator.generateWeightedIncidenceMatrix(simData.size);
 		incidenceMatrix = generator.reduceIncidenceMatrixDensity(incidenceMatrix, simData.density, simData.size);
-
 		// Time Prim's algorithm on incidence matrix
 		start = std::chrono::high_resolution_clock::now();
 		auto primResultIM = algorithms.primAlgorithmIM(incidenceMatrix, simData.size);
 		end = std::chrono::high_resolution_clock::now();
 		times.primTimeIM.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
 		// Time Kruskal's algorithm on incidence matrix
 		start = std::chrono::high_resolution_clock::now();
 		auto kruskalResultIM = algorithms.kruskalAlgorithmIM(incidenceMatrix, simData.size);
 		end = std::chrono::high_resolution_clock::now();
 		times.kruskalTimeIM.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
-		// Incidence matrices are typically managed automatically (vector of vectors)
-		// No explicit cleanup needed unless using dynamic allocation
 	}
-
 	return results;
 }
 std::vector<spResultsData> performSPSimulation(mstSimData simData) {
-	// Create one result structure to store all times for this size
-	std::vector<spResultsData> results(1);  // Only one element needed
+	std::vector<spResultsData> results(1);
 	spResultsData& times = results[0];
-
 	Generator generator(simData.maxRand);
 	Algorithms algorithms;
-
 	// Reserve space for better performance
 	times.dijkstraTimeAL.reserve(simData.instanceAmount);
 	times.bellmanFordTimeAL.reserve(simData.instanceAmount);
 	times.dijkstraTimeIM.reserve(simData.instanceAmount);
 	times.bellmanFordTimeIM.reserve(simData.instanceAmount);
-
-	// Process each instance individually to save memory
 	for (int i = 0; i < simData.instanceAmount; ++i) {
 		// Generate and test directed adjacency list
 		auto adjacencyList = generator.generateWeightedDirectedAdjacencyList(simData.size);
 		adjacencyList = generator.reduceDirectedAdjacencyListDensity(adjacencyList, simData.density, simData.size);
-
 		// Time Dijkstra's algorithm on adjacency list
 		auto start = std::chrono::high_resolution_clock::now();
 		auto dijkstraResultAL = algorithms.dijkstraAlgorithmAL(adjacencyList, simData.size);
 		auto end = std::chrono::high_resolution_clock::now();
 		times.dijkstraTimeAL.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
 		// Time Bellman-Ford algorithm on adjacency list
 		start = std::chrono::high_resolution_clock::now();
 		auto bellmanFordResultAL = algorithms.bellmanFordAlgorithmAL(adjacencyList, simData.size);
 		end = std::chrono::high_resolution_clock::now();
 		times.bellmanFordTimeAL.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
 		// Clean up adjacency list
 		generator.deleteAdjacencyList(adjacencyList);
-
 		// Generate and test directed incidence matrix
 		auto incidenceMatrix = generator.generateWeightedDirectedIncidenceMatrix(simData.size);
 		incidenceMatrix = generator.reduceIncidenceMatrixDensity(incidenceMatrix, simData.density, simData.size);
-
 		// Time Dijkstra's algorithm on incidence matrix
 		start = std::chrono::high_resolution_clock::now();
 		auto dijkstraResultIM = algorithms.dijkstraAlgorithmIM(incidenceMatrix, simData.size);
 		end = std::chrono::high_resolution_clock::now();
 		times.dijkstraTimeIM.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
 		// Time Bellman-Ford algorithm on incidence matrix
 		start = std::chrono::high_resolution_clock::now();
 		auto bellmanFordResultIM = algorithms.bellmanFordAlgorithmIM(incidenceMatrix, simData.size);
 		end = std::chrono::high_resolution_clock::now();
 		times.bellmanFordTimeIM.push_back(std::chrono::duration<double, std::milli>(end - start).count());
-
-		// Incidence matrices are typically managed automatically
 	}
-
 	return results;
 }
 void performSim(const fileData fileData) {

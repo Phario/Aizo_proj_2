@@ -33,6 +33,7 @@ public:
 	Generator(int maxRand) : maxRand(maxRand){// Maximum weight for edges
 		srand(time(NULL)); 
 	}
+	// Generating graphs from scratch
 	std::vector<std::vector<int>> generateWeightedIncidenceMatrix(int n) {
 		std::vector<std::vector<int>> incidenceMatrix(n, std::vector<int>(n * (n - 1) / 2, 0));
 		int edgeIndex = 0;
@@ -235,31 +236,81 @@ public:
 
 		return reducedList;
 	}	//print adjacency list for debugging
-
-	std::vector<std::vector<int>> loadWeightedDirectedAdjacencyListFromFile(const std::string& filename) {
-		std::vector<std::vector<int>> adjacencyList;
+	// Generating graphs from file
+	std::vector<std::vector<int>> generateWeightedIncidenceMatrixFromFile(const std::string& filename) {
 		std::ifstream file(filename);
 		if (!file.is_open()) {
 			std::cerr << "Error opening file: " << filename << std::endl;
-			return adjacencyList;
+			return {};
 		}
-		int vertices, edges;
+		int edges, vertices;
 		file >> edges >> vertices;
-		adjacencyList.resize(vertices);
+		std::vector<std::vector<int>> incidenceMatrix(vertices, std::vector<int>(edges, 0));
 		for (int i = 0; i < edges; i++) {
 			int start, end, weight;
 			file >> start >> end >> weight;
-			if (start < 0 || start >= vertices || end < 0 || end >= vertices) {
-				std::cerr << "Invalid edge in file: " << start << " -> " << end << std::endl;
-				continue;
-			}
-			adjacencyList[start].push_back(end);
-			adjacencyList[end].push_back(start); // For undirected graph
+			incidenceMatrix[start][i] = weight;
+			incidenceMatrix[end][i] = weight; // For undirected graph
+		}
+		file.close();
+		return incidenceMatrix;
+	}
+	std::vector<neighbour*> generateWeightedAdjacencyListFromFile(const std::string& filename) {
+		std::ifstream file(filename);
+		if (!file.is_open()) {
+			std::cerr << "Error opening file: " << filename << std::endl;
+			return {};
+		}
+		int edges, vertices;
+		file >> edges >> vertices;
+		std::vector<neighbour*> adjacencyList(vertices, nullptr);
+		for (int i = 0; i < edges; i++) {
+			int start, end, weight;
+			file >> start >> end >> weight;
+			// Add edge to adjacency list (undirected)
+			adjacencyList[start] = new neighbour{ adjacencyList[start], end, weight };
+			adjacencyList[end] = new neighbour{ adjacencyList[end], start, weight };
 		}
 		file.close();
 		return adjacencyList;
 	}
-
+	std::vector<neighbour*> generateWeightedDirectedAdjacencyListFromFile(const std::string& filename) {
+		std::ifstream file(filename);
+		if (!file.is_open()) {
+			std::cerr << "Error opening file: " << filename << std::endl;
+			return {};
+		}
+		int edges, vertices;
+		file >> edges >> vertices;
+		std::vector<neighbour*> adjacencyList(vertices, nullptr);
+		for (int i = 0; i < edges; i++) {
+			int start, end, weight;
+			file >> start >> end >> weight;
+			// Add directed edge to adjacency list
+			adjacencyList[start] = new neighbour{ adjacencyList[start], end, weight };
+		}
+		file.close();
+		return adjacencyList;
+	}
+	std::vector<std::vector<int>> generateWeightedDirectedIncidenceMatrixFromFile(const std::string& filename) {
+		std::ifstream file(filename);
+		if (!file.is_open()) {
+			std::cerr << "Error opening file: " << filename << std::endl;
+			return {};
+		}
+		int edges, vertices;
+		file >> edges >> vertices;
+		std::vector<std::vector<int>> incidenceMatrix(vertices, std::vector<int>(edges, 0));
+		for (int i = 0; i < edges; i++) {
+			int start, end, weight;
+			file >> start >> end >> weight;
+			incidenceMatrix[start][i] = weight; // Directed edge
+			incidenceMatrix[end][i] = -weight; // Indicating direction
+		}
+		file.close();
+		return incidenceMatrix;
+	}
+	// Utils
 	void printAdjacencyList(const std::vector<neighbour*>& list, int vertices) {
 		for (int i = 0; i < vertices; i++) {
 			std::cout << "Vertex " << i << ": ";
@@ -271,7 +322,7 @@ public:
 			std::cout << std::endl;
 		}
 	}
-	//print incidence matrix in formatted table format for debugging
+	// Print incidence matrix in formatted table format for debugging
 	void printIncidenceMatrix(const std::vector<std::vector<int>>& matrix, int vertices) {
 		int edges = matrix[0].size();
 		std::cout << "Incidence Matrix (" << vertices << " vertices, " << edges << " edges):" << std::endl;
@@ -283,8 +334,7 @@ public:
 			std::cout << std::endl;
 		}
 	}
-	//destructors
-	//deallocate adjacency list
+	// Deallocate adjacency list
 	void deleteAdjacencyList(std::vector<neighbour*>& list) {
 		for (auto& head : list) {
 			while (head) {

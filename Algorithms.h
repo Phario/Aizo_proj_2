@@ -7,6 +7,9 @@
 #include<string>
 #include <algorithm>
 #include "Generator.h"
+#include <iostream>
+#include <queue>
+
 
 struct pathResult {
 	std::vector<int> cost;           // cost[i] = shortest distance from source to vertex i
@@ -24,6 +27,15 @@ struct Edge {
 	int weight;
 	bool operator<(const Edge& other) const {
 		return weight < other.weight;
+	}
+};
+struct DijkstraNode {
+	int vertex;
+	int distance;
+
+	// For min heap
+	bool operator>(const DijkstraNode& other) const {
+		return distance > other.distance;
 	}
 };
 class Algorithms {
@@ -231,56 +243,60 @@ public:
 		std::vector<int> prev(vertices, -1);
 		std::vector<bool> visited(vertices, false);
 
+		// Use priority queue for O(log V) minimum extraction instead of O(V) linear search
+		std::priority_queue<DijkstraNode, std::vector<DijkstraNode>, std::greater<DijkstraNode>> pq;
+
 		cost[source] = 0;
+		pq.push({ source, 0 });
 
-		// Run Dijkstra's algorithm
-		for (int i = 0; i < vertices; i++) {
-			// Find the unvisited vertex with minimum cost
-			int u = -1;
-			for (int j = 0; j < vertices; j++) {
-				if (!visited[j] && (u == -1 || cost[j] < cost[u])) {
-					u = j;
-				}
-			}
+		while (!pq.empty()) {
+			DijkstraNode current = pq.top();
+			pq.pop();
 
-			// If we can't reach any more vertices, break
-			if (cost[u] == INT_MAX) break;
+			int u = current.vertex;
+
+			// Skip if already visited (handles duplicate entries in priority queue)
+			if (visited[u]) continue;
 
 			visited[u] = true;
 
 			// Relax all adjacent edges
 			for (neighbour* v = adjacencyList[u]; v != nullptr; v = v->next) {
-				if (!visited[v->vertex] && cost[u] + v->weight < cost[v->vertex]) {
-					cost[v->vertex] = cost[u] + v->weight;
-					prev[v->vertex] = u;
+				int vertex = v->vertex;
+				int weight = v->weight;
+
+				// Only process unvisited vertices and check for overflow
+				if (!visited[vertex] && cost[u] != INT_MAX && cost[u] + weight < cost[vertex]) {
+					cost[vertex] = cost[u] + weight;
+					prev[vertex] = u;
+					pq.push({ vertex, cost[vertex] });
 				}
 			}
 		}
 
-		// Build result structure
+		// Build result structure with move semantics for better performance
 		pathResult result;
 		result.source = source;
-		result.cost = cost;
-		result.predecessors = prev;
+		result.cost = std::move(cost);
+		result.predecessors = std::move(prev);
 		result.paths.resize(vertices);
 
 		// Reconstruct all paths
 		for (int target = 0; target < vertices; target++) {
-			if (cost[target] == INT_MAX) {
-				// No path to this vertex
-				result.paths[target] = {}; // Empty path
+			if (result.cost[target] == INT_MAX) {
+				// No path to this vertex - paths[target] is already empty
+				continue;
 			}
-			else {
-				// Reconstruct path from source to target
-				std::vector<int> path;
-				int current = target;
-				while (current != -1) {
-					path.push_back(current);
-					current = prev[current];
-				}
-				std::reverse(path.begin(), path.end());
-				result.paths[target] = path;
+
+			// Reconstruct path from source to target
+			std::vector<int> path;
+			int current = target;
+			while (current != -1) {
+				path.push_back(current);
+				current = result.predecessors[current];
 			}
+			std::reverse(path.begin(), path.end());
+			result.paths[target] = std::move(path);
 		}
 
 		return result;
@@ -292,75 +308,93 @@ public:
 		std::vector<bool> visited(vertices, false);
 
 		int numEdges = incidenceMatrix[0].size();
-		cost[source] = 0;
 
-		// Run Dijkstra's algorithm
-		for (int i = 0; i < vertices; i++) {
-			// Find the unvisited vertex with minimum distance
-			int u = -1;
-			for (int j = 0; j < vertices; j++) {
-				if (!visited[j] && (u == -1 || cost[j] < cost[u])) {
-					u = j;
+		// Pre-compute adjacency information from incidence matrix for better performance
+		// This converts O(V*E) edge lookups to O(V) adjacency lookups
+		std::vector<std::vector<std::pair<int, int>>> adjacencyFromIM(vertices);
+
+		for (int edgeIdx = 0; edgeIdx < numEdges; edgeIdx++) {
+			int u = -1, v = -1;
+			int weight = 0;
+
+			// Find the two vertices connected by this edge
+			for (int vertex = 0; vertex < vertices; vertex++) {
+				if (incidenceMatrix[vertex][edgeIdx] != 0) {
+					if (u == -1) {
+						u = vertex;
+						weight = abs(incidenceMatrix[vertex][edgeIdx]);
+					}
+					else {
+						v = vertex;
+						break;
+					}
 				}
 			}
 
-			// If we can't reach any more vertices, break
-			if (cost[u] == INT_MAX) break;
+			// Add bidirectional edges to adjacency representation
+			if (u != -1 && v != -1) {
+				adjacencyFromIM[u].emplace_back(v, weight);
+				adjacencyFromIM[v].emplace_back(u, weight);
+			}
+		}
+
+		// Use priority queue for efficient minimum extraction
+		std::priority_queue<DijkstraNode, std::vector<DijkstraNode>, std::greater<DijkstraNode>> pq;
+
+		cost[source] = 0;
+		pq.push({ source, 0 });
+
+		while (!pq.empty()) {
+			DijkstraNode current = pq.top();
+			pq.pop();
+
+			int u = current.vertex;
+
+			// Skip if already visited
+			if (visited[u]) continue;
 
 			visited[u] = true;
 
-			// Check all edges to find adjacent vertices
-			for (int edgeIdx = 0; edgeIdx < numEdges; edgeIdx++) {
-				// Check if vertex u participates in this edge
-				if (incidenceMatrix[u][edgeIdx] != 0) {
-					// Find the other vertex in this edge
-					for (int v = 0; v < vertices; v++) {
-						if (v != u && incidenceMatrix[v][edgeIdx] != 0) {
-							// Found adjacent vertex v
-							if (!visited[v]) {
-								// For weighted incidence matrix, the weight is the absolute value
-								int weight = abs(incidenceMatrix[u][edgeIdx]);
+			// Process all adjacent vertices using pre-computed adjacency
+			for (const auto& edge : adjacencyFromIM[u]) {
+				int vertex = edge.first;
+				int weight = edge.second;
 
-								if (cost[u] + weight < cost[v]) {
-									cost[v] = cost[u] + weight;
-									prev[v] = u;
-								}
-							}
-							break; // Each edge connects exactly 2 vertices
-						}
-					}
+				if (!visited[vertex] && cost[u] != INT_MAX && cost[u] + weight < cost[vertex]) {
+					cost[vertex] = cost[u] + weight;
+					prev[vertex] = u;
+					pq.push({ vertex, cost[vertex] });
 				}
 			}
 		}
 
-		// Build result structure
+		// Build result structure with move semantics
 		pathResult result;
 		result.source = source;
-		result.cost = cost;
-		result.predecessors = prev;
+		result.cost = std::move(cost);
+		result.predecessors = std::move(prev);
 		result.paths.resize(vertices);
 
 		// Reconstruct all paths
 		for (int target = 0; target < vertices; target++) {
-			if (cost[target] == INT_MAX) {
-				// No path to this vertex
-				result.paths[target] = {}; // Empty path
+			if (result.cost[target] == INT_MAX) {
+				// No path to this vertex - paths[target] is already empty
+				continue;
 			}
-			else {
-				// Reconstruct path from source to target
-				std::vector<int> path;
-				int current = target;
-				while (current != -1) {
-					path.push_back(current);
-					current = prev[current];
-				}
-				std::reverse(path.begin(), path.end());
-				result.paths[target] = path;
+
+			// Reconstruct path from source to target
+			std::vector<int> path;
+			int current = target;
+			while (current != -1) {
+				path.push_back(current);
+				current = result.predecessors[current];
 			}
+			std::reverse(path.begin(), path.end());
+			result.paths[target] = std::move(path);
 		}
 
 		return result;
-	}
+	}	
 	pathResult bellmanFordAlgorithmAL(const std::vector<neighbour*>& adjacencyList, int vertices) {
 		int source = 0; // Always start from vertex 0
 		std::vector<int> cost(vertices, INT_MAX);
